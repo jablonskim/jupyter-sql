@@ -63,7 +63,6 @@ class SqlKernel(BaseKernel):
             self.__sql_connection = None
             self.__sql_engine = None
 
-        # TODO: try if ok
         eng = create_engine(connection_string)
         con = eng.connect()
 
@@ -71,20 +70,71 @@ class SqlKernel(BaseKernel):
         self.__sql_connection = con
 
     def __process_sql_part(self, code, silent):
+        if len(code.strip()) == 0:
+            return
+
         if self.__sql_connection is None:
-            # TODO
-            pass
+            raise RuntimeError('SQL query before connection')
 
         statements = sqlparse.split(code)
 
         for statement in statements:
-            self.__sql_connection.execute(statement)
-
-            # TODO
+            result = self.__sql_connection.execute(statement)
 
             if not silent:
-                stream_content = {'name': 'stdout', 'text': 'OK'}
-                self.send_response(self.iopub_socket, 'stream', stream_content)
+                text = None
+
+                stmt_type = sqlparse.parse(statement)[0].get_type()
+
+                if stmt_type == 'SELECT':
+                    text = self.__process_select(result.keys(), result.fetchall())
+
+                if stmt_type == 'INSERT':
+                    text = 'Insert succeeded\n'
+
+                if stmt_type == 'UPDATE':
+                    text = 'Updated %d rows\n' % result.rowcount
+
+                if stmt_type == 'DELETE':
+                    text = 'Deleted %d rows\n' % result.rowcount
+
+                if text is not None:
+                    stream_content = {'name': 'stdout', 'text': text}
+                    self.send_response(self.iopub_socket, 'stream', stream_content)
+
+    def __process_select(self, keys, rows):
+        columns_size = [0 for _ in range(len(keys))]
+
+        for i, k in enumerate(keys):
+            columns_size[i] = len(k)
+
+        for row in rows:
+            for i, k in enumerate(row):
+                columns_size[i] = max(len(str(k)), columns_size[i])
+
+        separator_line = '+'
+        for i in range(len(columns_size)):
+            separator_line += ('-' * (columns_size[i] + 2)) + '+'
+        separator_line += '\n'
+
+        text = 'Selected %d rows:\n' % len(rows)
+
+        text += separator_line + '|'
+
+        for i, k in enumerate(keys):
+            text += ' ' + str(k) + ((columns_size[i] - len(str(k))) * ' ') + ' |'
+
+        text += '\n' + separator_line
+
+        for row in rows:
+            text += '|'
+            for i, k in enumerate(row):
+                text += ' ' + str(k) + ((columns_size[i] - len(str(k))) * ' ') + ' |'
+            text += '\n'
+
+        text += separator_line + '\n'
+
+        return text
 
 
 if __name__ == '__main__':
