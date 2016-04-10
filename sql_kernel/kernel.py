@@ -1,5 +1,6 @@
 from ipykernel.kernelbase import Kernel as BaseKernel
 from sqlalchemy import create_engine
+from sqlalchemy.exc import DatabaseError
 import sqlparse
 import re
 from sys import exc_info
@@ -28,6 +29,7 @@ class SqlKernel(BaseKernel):
     def do_execute(self, code, silent=False, store_history=True, user_expressions=None, allow_stdin=False):
 
         code_parts = re.split(R'(^[ \t]*!.+;$)', code, flags=re.MULTILINE)
+        error_content = None
 
         try:
             for part in code_parts:
@@ -38,14 +40,23 @@ class SqlKernel(BaseKernel):
                     self.__process_connection_str(connection_str)
                 else:
                     self.__process_sql_part(part, silent)
+        except DatabaseError as e:
+            ex_type, ex, tb = exc_info()
+            error_content = {
+                'ename': str(ex_type),
+                'evalue': str(e),
+                'traceback': [str(e)]
+            }
         except Exception as e:
             ex_type, ex, tb = exc_info()
             error_content = {
-                'execution_count': self.execution_count,
                 'ename': str(ex_type),
                 'evalue': str(e),
                 'traceback': traceback.format_exception(ex_type, ex, tb)
             }
+
+        if error_content is not None:
+            error_content['execution_count'] = self.execution_count
             self.send_response(self.iopub_socket, 'error', error_content)
             error_content['status'] = 'error'
             return error_content
