@@ -2,6 +2,8 @@ from ipykernel.kernelbase import Kernel as BaseKernel
 from sqlalchemy import create_engine
 import sqlparse
 import re
+from sys import exc_info
+import traceback
 
 
 class SqlKernel(BaseKernel):
@@ -32,16 +34,17 @@ class SqlKernel(BaseKernel):
                 part = part.strip()
 
                 if part.startswith('!') and part.endswith(';'):
-                    connection_str = part.rstrip('!').lstrip(';').strip()
+                    connection_str = part.rstrip(';').lstrip('!').strip()
                     self.__process_connection_str(connection_str)
                 else:
                     self.__process_sql_part(part, silent)
         except Exception as e:
+            ex_type, ex, tb = exc_info()
             error_content = {
                 'execution_count': self.execution_count,
-                'ename': '',
+                'ename': str(ex_type),
                 'evalue': str(e),
-                'traceback': ''
+                'traceback': traceback.format_exception(ex_type, ex, tb)
             }
             self.send_response(self.iopub_socket, 'error', error_content)
             error_content['status'] = 'error'
