@@ -1,5 +1,0 @@
-{
-  "argv": ["python", "-m", "sql_kernel", "-f", "{connection_file}"],
-  "display_name": "SQL",
-  "language": "sql"
-}
