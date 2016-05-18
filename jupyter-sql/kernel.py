@@ -9,7 +9,7 @@ import traceback
 
 class SqlKernel(BaseKernel):
 
-    implementation = 'sql_kernel'
+    implementation = 'jupyter-sql'
     implementation_version = '0.1'
     banner = 'SQL Kernel ' + implementation_version
     language_version = 'SQL:2011'
